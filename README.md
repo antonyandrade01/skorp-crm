@@ -6,6 +6,8 @@
 >
 > **Private repository notice:** This repository is the public architecture showcase for Skorp CRM. Source code is private because the product is in commercial beta. Live demos are available on request: [antonymsandrade@gmail.com](mailto:antonymsandrade@gmail.com) or [LinkedIn](https://www.linkedin.com/in/antonyandrade01/).
 
+**No ar / Live:** [skorp.com.br](https://skorp.com.br) (site do produto; o app pede login / product site; the app requires login). Acesso de demonstração sob pedido / Demo access on request.
+
 ---
 
 ## Arquitetura / Architecture
