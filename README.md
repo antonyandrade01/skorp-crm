@@ -14,7 +14,7 @@
 
 ```mermaid
 flowchart LR
-    WA["WhatsApp (Evolution API + Cloud API)"] --> RMQ["RabbitMQ 4 (evolution_exchange + DLX/DLQ)"]
+    WA["WhatsApp (Baileys + Cloud API)"] --> RMQ["RabbitMQ 4 (exchange + DLX/DLQ)"]
     IG["Instagram Direct & Web Widget"] --> API["FastAPI API (Python 3.14)"]
     RMQ --> CONS["Async Consumer (aio-pika, prefetch 30)"]
     CONS --> API
@@ -44,7 +44,7 @@ O Skorp CRM centraliza o atendimento omnichannel em um funil comercial multi-ten
 ### Números reais
 
 - Opera em produção beta desde agosto de 2026, com clientes beta reais e equipe não técnica cuidando de implantação e comercial.
-- Conecta 13 canais ativos: 5 instâncias Evolution API, 4 contas de Instagram, 3 widgets de site e 1 canal WhatsApp Cloud API.
+- Conecta 13 canais ativos: 5 instâncias WhatsApp via Baileys, 4 contas de Instagram, 3 widgets de site e 1 canal WhatsApp Cloud API.
 - Registra cerca de 3.000 contatos, 1.383 conversas e 115.000 mensagens acumuladas, sendo 71.000 mensagens em 30 dias (média de ~2.400 por dia).
 - Mantém 100 migrations Alembic, 102 arquivos de teste Pytest no backend e 17 arquivos de teste unitário no frontend (além de testes E2E em Playwright).
 - Executa backup cifrado (AES-256) do banco de hora em hora (RPO de 1 hora) com cópia externa e teste automático semanal de restauração validando 57 tabelas, versão do Alembic e pelo menos 95% das mensagens.
@@ -65,7 +65,7 @@ Trade-off: o Valkey roda com `maxmemory 768mb` e política `noeviction`. Ao bate
 
 #### Filas separadas, pool controlado e merge de leads só com prova exata
 
-Eventos da Evolution API chegam pelo RabbitMQ 4 (`aio-pika`, `prefetch_count=30`, DLX/DLQ e hostname fixo `rabbit@rabbitmq` para evitar nós órfãos a cada deploy). O `ack()` fica fora do bloco `try/except` que chama `reject(requeue=False)`, evitando mandar eventos já processados para a Dead Letter Queue quando ocorre instabilidade momentânea no canal. O Celery roda com 8 workers prefork, `task_acks_late=True`, descarte de pool herdado no `worker_process_init` e limite de `3+2` conexões por filho para não exceder `max_connections` do PostgreSQL.
+Eventos do WhatsApp (Baileys) chegam pelo RabbitMQ 4 (`aio-pika`, `prefetch_count=30`, DLX/DLQ e hostname fixo `rabbit@rabbitmq` para evitar nós órfãos a cada deploy). O `ack()` fica fora do bloco `try/except` que chama `reject(requeue=False)`, evitando mandar eventos já processados para a Dead Letter Queue quando ocorre instabilidade momentânea no canal. O Celery roda com 8 workers prefork, `task_acks_late=True`, descarte de pool herdado no `worker_process_init` e limite de `3+2` conexões por filho para não exceder `max_connections` do PostgreSQL.
 
 Na reconciliação de leads (`@lid` da Meta com telefone real, cobrindo DDI 55 e nono dígito), o sistema só funde dois cadastros quando WhatsApp entrega telefone e LID juntos na mesma mensagem e o casamento é 1 para 1, sem ambiguidade. O hash de foto de perfil (`profile_pic_hash`) foi retirado do critério de merge em outubro de 2026 porque logotipos de empresa e imagens padrão causavam fusões incorretas entre pessoas distintas. Registros mesclados recebem soft delete com `merged_into_id` preservando o histórico de conversas, negócios e reuniões. Eventos da Meta CAPI são enfileirados via listener `after_commit` do SQLAlchemy para nunca rodarem antes da gravação real do negócio.
 
@@ -76,7 +76,7 @@ Anexos de mídia saem do banco relacional e vão para o SeaweedFS 4.45 (licença
 ### Em produção vs. em teste
 
 Em produção (beta):
-- Inbox omnichannel em tempo real via WebSockets (WhatsApp Evolution API com patches próprios em Baileys, WhatsApp Cloud API, Instagram Direct e widget de site).
+- Inbox omnichannel em tempo real via WebSockets (WhatsApp via Baileys com patches próprios, WhatsApp Cloud API, Instagram Direct e widget de site).
 - Funil de vendas Kanban, gestão de contatos, reconciliação de `@lid`, envio de conversões para Meta CAPI e sincronização de insights do Meta Ads.
 - Construtor visual de fluxos, formulários, agendamentos com lembretes automáticos, conformidade LGPD e proteção CrowdSec LAPI (com blocklists públicas removidas após bloquearem webhooks legítimos da Meta e faixas CGNAT).
 
@@ -99,7 +99,7 @@ Skorp CRM brings those channels into a multi-tenant sales pipeline, merges lead 
 ### Real numbers
 
 - Running in beta production since August 2026 with beta customers and a non-technical team handling onboarding and sales.
-- Connects 13 active channels: 5 Evolution API instances, 4 Instagram accounts, 3 website widgets, and 1 WhatsApp Cloud API channel.
+- Connects 13 active channels: 5 WhatsApp instances via Baileys, 4 Instagram accounts, 3 website widgets, and 1 WhatsApp Cloud API channel.
 - Holds ~3,000 contacts, 1,383 conversations, and 115,000 total messages, including 71,000 messages in 30 days (~2,400/day).
 - Maintains 100 Alembic migrations, 102 backend Pytest test files, and 17 frontend unit test suites (plus Playwright E2E specs).
 - Runs hourly AES-256 encrypted database backups (1-hour RPO) copied off-server and an automated weekly restore test checking 57 tables, Alembic head version, and at least 95% of messages.
@@ -120,7 +120,7 @@ Trade-off: Valkey runs with `maxmemory 768mb` and `noeviction`. Hitting the cap 
 
 #### Separated queues, bounded DB pools, and proof-only lead merge
 
-Evolution API events arrive over RabbitMQ 4 (`aio-pika`, `prefetch_count=30`, DLX/DLQ, fixed node hostname `rabbit@rabbitmq` so Coolify deploys do not leave orphan broker nodes). Calling `ack()` stays outside the `try/except` block that triggers `reject(requeue=False)`, preventing already-processed messages from entering the DLQ on transient channel drops. Celery runs 8 prefork workers with `task_acks_late=True`, disposes inherited pools on `worker_process_init`, and bounds each child pool to `3+2` connections to protect PostgreSQL `max_connections`.
+WhatsApp (Baileys) events arrive over RabbitMQ 4 (`aio-pika`, `prefetch_count=30`, DLX/DLQ, fixed node hostname `rabbit@rabbitmq` so Coolify deploys do not leave orphan broker nodes). Calling `ack()` stays outside the `try/except` block that triggers `reject(requeue=False)`, preventing already-processed messages from entering the DLQ on transient channel drops. Celery runs 8 prefork workers with `task_acks_late=True`, disposes inherited pools on `worker_process_init`, and bounds each child pool to `3+2` connections to protect PostgreSQL `max_connections`.
 
 Identity reconciliation matches Meta Ads WhatsApp `@lid` records to real phone numbers (including Brazilian DDI 55 and 9th-digit variants) only when WhatsApp delivers both values together and the match is strictly 1-to-1. Avatar hashing (`profile_pic_hash`) was removed from merge matching in October 2026 because shared company logos and default icons could merge unrelated contacts. Merged duplicates are soft-deleted with `merged_into_id` while moving conversations, messages, deals, and meeting records to the surviving contact. Meta CAPI dispatches queue through a SQLAlchemy `after_commit` listener so workers never read uncommitted deals.
 
@@ -131,7 +131,7 @@ Media attachments live in SeaweedFS 4.45 (chosen for its Apache-2.0 license). Th
 ### Production vs. in testing
 
 In production (beta):
-- Real-time omnichannel inbox over WebSockets (WhatsApp via patched Evolution API/Baileys, WhatsApp Cloud API, Instagram Direct, and website widget).
+- Real-time omnichannel inbox over WebSockets (WhatsApp via patched Baileys, WhatsApp Cloud API, Instagram Direct, and website widget).
 - Kanban sales pipeline, contact management, `@lid` identity reconciliation, Meta CAPI conversion dispatch, and Meta Ads insights sync.
 - Visual flow builder, web forms, appointment reminders, LGPD data-handling tools, and CrowdSec LAPI rules (external public blocklists were dropped after blocking legitimate Meta webhooks and mobile CGNAT ranges).
 
